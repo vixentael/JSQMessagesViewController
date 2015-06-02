@@ -268,4 +268,12 @@
  */
 - (void)scrollToBottomAnimated:(BOOL)animated;
 
+/**
+ *  Determines the alignment of the cell. Given a text, it tries to guess the language, and determine the alignment from that guess. 
+ *  Default alignment is @link NSTextAlignmentLeft
+ *
+ *  @param astring is the text, from which the alingment should be determined.
+ */
+- (NSTextAlignment)alignmentForString:(NSString *)astring;
+
 @end

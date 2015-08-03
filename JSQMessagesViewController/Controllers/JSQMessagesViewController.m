@@ -228,13 +228,12 @@ static void * kJSQMessagesKeyValueObservingContext = &kJSQMessagesKeyValueObserv
     [self.collectionView.collectionViewLayout invalidateLayout];
 
     if (self.automaticallyScrollsToMostRecentMessage) {
-        dispatch_async(dispatch_get_main_queue(), ^{
-            [self scrollToBottomAnimated:NO];
-            [self.collectionView.collectionViewLayout invalidateLayoutWithContext:[JSQMessagesCollectionViewFlowLayoutInvalidationContext context]];
-        });
+        [self scrollToBottomAnimated:NO];
+        [self.collectionView.collectionViewLayout invalidateLayoutWithContext:[JSQMessagesCollectionViewFlowLayoutInvalidationContext context]];
     }
 
     [self jsq_updateKeyboardTriggerPoint];
+    [self.keyboardController beginListeningForKeyboard];
 }
 
 - (void)viewDidAppear:(BOOL)animated
@@ -242,7 +241,6 @@ static void * kJSQMessagesKeyValueObservingContext = &kJSQMessagesKeyValueObserv
     [super viewDidAppear:animated];
     [self jsq_addObservers];
     [self jsq_addActionToInteractivePopGestureRecognizer:YES];
-    [self.keyboardController beginListeningForKeyboard];
 
     if ([UIDevice jsq_isCurrentDeviceBeforeiOS8]) {
         [self.snapshotView removeFromSuperview];
@@ -254,13 +252,13 @@ static void * kJSQMessagesKeyValueObservingContext = &kJSQMessagesKeyValueObserv
     [super viewWillDisappear:animated];
     [self jsq_addActionToInteractivePopGestureRecognizer:NO];
     self.collectionView.collectionViewLayout.springinessEnabled = NO;
+    [self.keyboardController endListeningForKeyboard];
 }
 
 - (void)viewDidDisappear:(BOOL)animated
 {
     [super viewDidDisappear:animated];
     [self jsq_removeObservers];
-    [self.keyboardController endListeningForKeyboard];
 }
 
 - (void)didReceiveMemoryWarning
@@ -468,6 +466,14 @@ static void * kJSQMessagesKeyValueObservingContext = &kJSQMessagesKeyValueObserv
     if (!isMediaMessage) {
         cell.textView.text = [messageItem text];
 
+        // Auto detect language and set text alignment accordingly
+        NSTextAlignment ta = NSTextAlignmentLeft;
+        if (cell.textView.text != nil)
+            ta = [self alignmentForString:cell.textView.text];
+        else if (cell.textView.attributedText != nil)
+            ta = [self alignmentForString:cell.textView.attributedText.string];
+        cell.textView.textAlignment = ta;
+        
         if ([UIDevice jsq_isCurrentDeviceBeforeiOS8]) {
             //  workaround for iOS 7 textView data detectors bug
             cell.textView.text = nil;
@@ -527,13 +533,21 @@ static void * kJSQMessagesKeyValueObservingContext = &kJSQMessagesKeyValueObserv
         cell.messageBubbleTopLabel.textInsets = UIEdgeInsetsMake(0.0f, bubbleTopLabelInset, 0.0f, 0.0f);
     }
 
-    cell.textView.dataDetectorTypes = UIDataDetectorTypeAll;
-
     cell.backgroundColor = [UIColor clearColor];
-    cell.layer.rasterizationScale = [UIScreen mainScreen].scale;
-    cell.layer.shouldRasterize = YES;
-
+    
     return cell;
+}
+
+-(NSTextAlignment)alignmentForString:(NSString *)astring
+{
+    if (astring.length) {
+        NSArray *rightLeftLanguages = @[@"ar",@"arc",@"bcc",@"bqi",@"ckb",@"dv",@"fa",@"glk",@"he",@"ku",@"mzn",@"pnb",@"ps",@"sd",@"ug",@"ur",@"yi"];
+        NSString *lang = CFBridgingRelease(CFStringTokenizerCopyBestStringLanguage((CFStringRef)astring,CFRangeMake(0,[astring length])));
+        if ([rightLeftLanguages containsObject:lang]) {
+            return NSTextAlignmentRight;
+        }
+    }
+    return NSTextAlignmentLeft;
 }
 
 - (UICollectionReusableView *)collectionView:(JSQMessagesCollectionView *)collectionView
@@ -686,6 +700,13 @@ static void * kJSQMessagesKeyValueObservingContext = &kJSQMessagesKeyValueObserv
 
 #pragma mark - Text view delegate
 
+- (BOOL)textViewShouldBeginEditing:(UITextView *)textView {
+    if ([self.delegate respondsToSelector:@selector(messagesViewControllerShouldBeginEditingTextView:)]) {
+        return [self.delegate messagesViewControllerShouldBeginEditingTextView:self];
+    }
+    return YES;
+}
+
 - (void)textViewDidBeginEditing:(UITextView *)textView
 {
     if (textView != self.inputToolbar.contentView.textView) {
@@ -715,6 +736,9 @@ static void * kJSQMessagesKeyValueObservingContext = &kJSQMessagesKeyValueObserv
     }
 
     [textView resignFirstResponder];
+    if ([self.delegate respondsToSelector:@selector(messagesViewControllerDidEndEditingTextView:)]) {
+        [self.delegate messagesViewControllerDidEndEditingTextView:self];
+    }
 }
 
 #pragma mark - Notifications

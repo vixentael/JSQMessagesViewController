@@ -1,6 +1,6 @@
-Forked version with some merged pull-requests
+Forked version with some merged pull-requests (merged to develop)
 
-see release_8.0 branch
+using https://github.com/jessesquires/JSQMessagesViewController/tree/release_8.0 as base
 
 merged:
 * https://github.com/jessesquires/JSQMessagesViewController/pull/1066
